@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  /* =========================================================================
+     Paleta de 12 colores exactos de la Sección 16 (BODEGA_FC_ESPECIFICACION_RECONSTRUCCION.md)
+     ========================================================================= */
+  --color-fondo: #FFFBF5;
+  --color-texto-principal: #292524;
+  --color-tarjeta: #FFFFFF;
+  --color-primario: #2D6A4F;
+  --color-marca-oscuro: #1B4332;
+  --color-marca-suave: #D8F3E3;
+  --color-atenuado: #F2EDE4;
+  --color-texto-atenuado: #78716C;
+  --color-destructivo: #DC2626;
+  --color-precio-sube: #DC2626;
+  --color-precio-baja: #16A34A;
+  --color-borde: #E7E0D5;
+
+  --font-nunito: var(--font-nunito), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+@layer base {
+  html {
+    font-size: 14px;
+    font-family: var(--font-nunito);
+    background-color: #FFFBF5;
+    color: #292524;
+  }
+
+  body {
+    background-color: var(--color-fondo);
+    color: var(--color-texto-principal);
+    font-family: var(--font-nunito);
+    font-size: 14px;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
