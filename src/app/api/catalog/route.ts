@@ -53,7 +53,8 @@ export async function GET() {
           display_name
         )
       `)
-      .eq('upload_id', activeUpload.id);
+      .eq('upload_id', activeUpload.id)
+      .limit(5000);
 
     if (currentPricesError) {
       throw currentPricesError;
@@ -66,7 +67,8 @@ export async function GET() {
     // 5. Consultar productos existentes en Mi tienda (inStore)
     const { data: storeProducts, error: storeError } = await supabase
       .from('store_products')
-      .select('product_id');
+      .select('product_id')
+      .limit(5000);
 
     if (storeError) {
       throw storeError;
@@ -84,7 +86,8 @@ export async function GET() {
       .neq('id', activeUpload.id)
       .lte('price_list_date', activeUpload.price_list_date)
       .order('price_list_date', { ascending: false })
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(10);
 
     if (candidatesError) {
       throw candidatesError;
@@ -97,13 +100,13 @@ export async function GET() {
       const uploadRankMap = new Map<string, number>();
       candidateUploadIds.forEach((id, index) => uploadRankMap.set(id, index));
 
-      const productIds = currentPrices.map((cp) => cp.product_id);
-
+      // Consultar precios de las cargas candidatas sin filtrar por product_id para evitar
+      // que la URL de PostgREST exceda el límite HTTP (414 URI Too Long) con más de 1000 UUIDs.
       const { data: historicalPrices, error: histError } = await supabase
         .from('product_prices')
         .select('product_id, upload_id, box_price_bs')
-        .in('product_id', productIds)
-        .in('upload_id', candidateUploadIds);
+        .in('upload_id', candidateUploadIds)
+        .limit(20000);
 
       if (histError) {
         throw histError;
