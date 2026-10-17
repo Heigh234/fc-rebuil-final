@@ -84,6 +84,7 @@ export interface StoreProductDto {
   margins: number[];
   position: number;
   baseBoxPriceBs: number | null; // null === "Sin precio"
+  previousPriceBs: number | null; // Precio por caja en la carga candidata anterior (Sección 8: L325)
   unitPriceBs: number | null;
   salePrices: SalePricePreviewDto[];
 }

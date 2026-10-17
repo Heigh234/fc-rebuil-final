@@ -462,17 +462,17 @@ export function EditStoreProductSheet({
             </h4>
 
             {previewPricing.baseBoxPriceBs !== null ? (
-              <div className="flex flex-col gap-1.5 text-sm">
-                <div className="flex items-center justify-between text-[#78716C]">
+              <div className="flex flex-col gap-1.5 text-base">
+                <div className="flex items-baseline gap-1.5 text-[#78716C] flex-wrap">
                   <span>{MESSAGES.PREVIEW_BOX_PRICE}:</span>
-                  <span className="font-semibold text-[#292524] tabular-nums">
+                  <span className="font-bold text-[#292524] tabular-nums">
                     {formatBs(previewPricing.baseBoxPriceBs)}
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between text-[#78716C]">
+                <div className="flex items-baseline gap-1.5 text-[#78716C] flex-wrap">
                   <span>{MESSAGES.PREVIEW_UNIT_PRICE}:</span>
-                  <span className="font-semibold text-[#292524] tabular-nums">
+                  <span className="font-bold text-[#292524] tabular-nums">
                     {previewPricing.unitPriceBs !== null
                       ? formatBs(previewPricing.unitPriceBs)
                       : '-'}
@@ -482,29 +482,29 @@ export function EditStoreProductSheet({
                 {previewPricing.salePrices.map((sp, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center justify-between text-xs text-[#78716C]"
+                    className="flex items-baseline gap-1.5 text-base text-[#78716C] flex-wrap"
                   >
                     <span>
                       {MESSAGES.previewSalePriceWithMargin(
                         formatMarginPercent(sp.marginPercent).replace('%', '')
                       )}:
                     </span>
-                    <span className="font-bold text-[#2D6A4F] tabular-nums">
+                    <span className="font-extrabold text-[#2D6A4F] tabular-nums">
                       {formatBs(sp.salePriceBs)}
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col gap-1.5 text-sm">
-                <div className="flex items-center justify-between text-[#78716C]">
+              <div className="flex flex-col gap-1.5 text-base">
+                <div className="flex items-baseline gap-1.5 text-[#78716C] flex-wrap">
                   <span>{MESSAGES.PREVIEW_BOX_PRICE}:</span>
                   <span className="text-[#78716C] font-semibold text-xs px-2 py-0.5 bg-[#F2EDE4] rounded-md">
                     {MESSAGES.PRICELESS}
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between text-[#78716C]">
+                <div className="flex items-baseline gap-1.5 text-[#78716C] flex-wrap">
                   <span>{MESSAGES.PREVIEW_UNIT_PRICE}:</span>
                   <span className="text-[#78716C] font-semibold text-xs px-2 py-0.5 bg-[#F2EDE4] rounded-md">
                     {MESSAGES.PRICELESS}
@@ -514,7 +514,7 @@ export function EditStoreProductSheet({
                 {validMarginsList.map((margin, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center justify-between text-xs text-[#78716C]"
+                    className="flex items-baseline gap-1.5 text-base text-[#78716C] flex-wrap"
                   >
                     <span>
                       {MESSAGES.previewSalePriceWithMargin(

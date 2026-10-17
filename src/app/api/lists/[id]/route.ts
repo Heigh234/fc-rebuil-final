@@ -13,6 +13,7 @@ import {
 } from '@/lib/domain/pricing';
 import { shoppingListInputSchema } from '@/lib/domain/validations';
 import { MESSAGES } from '@/lib/i18n/messages';
+import { fetchUploadPricesMap } from '@/lib/supabase/catalog-queries';
 import type {
   ShoppingListDetailDto,
   ShoppingListItemDto,
@@ -178,23 +179,24 @@ export async function GET(
       });
     }
 
-    // Consultar precios de la carga activa
+    // Consultar precios de la carga activa para los ítems de esta lista
     const { data: settings } = await supabase
       .from('workspace_settings')
       .select('active_upload_id')
       .eq('singleton_key', true)
       .maybeSingle();
 
-    const catalogPriceMap = new Map<string, number>();
+    let catalogPriceMap = new Map<string, number>();
     if (settings?.active_upload_id) {
-      const { data: activePrices } = await supabase
-        .from('product_prices')
-        .select('product_id, box_price_bs')
-        .eq('upload_id', settings.active_upload_id);
+      const listProductIds = Array.from(
+        new Set((rawItems ?? []).map((it) => it.product_id))
+      );
 
-      for (const ap of activePrices ?? []) {
-        catalogPriceMap.set(ap.product_id, Number(ap.box_price_bs));
-      }
+      catalogPriceMap = await fetchUploadPricesMap(
+        supabase,
+        settings.active_upload_id,
+        listProductIds
+      );
     }
 
     // Resolver ítems y cálculo de resumen

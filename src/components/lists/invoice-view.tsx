@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { Lock, ArrowLeft, AlertCircle } from 'lucide-react';
-import { formatBs, formatCaracasDate, formatLineAmount } from '@/lib/domain/format';
+import { formatBs, formatCaracasDate } from '@/lib/domain/format';
 import { MESSAGES } from '@/lib/i18n/messages';
 import type { InvoiceDto } from '@/types/contracts';
 
@@ -98,24 +98,28 @@ export function InvoiceView({ invoice, onBack }: InvoiceViewProps) {
               <span className="font-bold text-sm text-[#292524] break-words flex-1">
                 {line.productName}
               </span>
-              <span className="font-extrabold text-sm text-[#292524] shrink-0">
-                {formatLineAmount(line.lineTotalBs, line.currencyTag)}
-              </span>
+              {line.currencyTag === 'USD' ? (
+                <span className="font-bold text-xs px-2.5 py-1 rounded-md bg-[#E0E7FF] text-[#3730A3] shrink-0">
+                  USD
+                </span>
+              ) : (
+                <span className="font-extrabold text-sm text-[#292524] shrink-0">
+                  {formatBs(line.lineTotalBs)}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center justify-between text-xs text-[#78716C] pt-1 border-t border-[#E7E0D5]/60">
               <span>
-                {line.quantity} {line.quantity === 1 ? 'caja' : 'cajas'} × {formatBs(line.boxPriceBs)}
+                {line.currencyTag === 'USD'
+                  ? `${line.quantity} ${line.quantity === 1 ? 'caja' : 'cajas'}`
+                  : `${line.quantity} ${line.quantity === 1 ? 'caja' : 'cajas'} × ${formatBs(line.boxPriceBs)}`}
               </span>
-              <span
-                className={`font-bold px-2 py-0.5 rounded-md ${
-                  line.currencyTag === 'USD'
-                    ? 'bg-[#E0E7FF] text-[#3730A3]'
-                    : 'bg-[#F2EDE4] text-[#292524]'
-                }`}
-              >
-                {line.currencyTag}
-              </span>
+              {line.currencyTag === 'VES' && (
+                <span className="font-bold px-2 py-0.5 rounded-md bg-[#F2EDE4] text-[#292524]">
+                  VES
+                </span>
+              )}
             </div>
           </div>
         ))}

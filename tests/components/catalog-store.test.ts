@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { matchesMultiWordQuery } from '@/lib/domain/search';
 import { resolveStoreProductPricing } from '@/lib/domain/pricing';
 import { storeProductInputSchema } from '@/lib/domain/validations';
+import { formatBs } from '@/lib/domain/format';
 import { MESSAGES } from '@/lib/i18n/messages';
+import type { StoreProductDto } from '@/types/contracts';
 
 describe('MOD-09: Catálogo y Mi Tienda - Lógica de Dominio y UI', () => {
   describe('Indicadores de variación de precio en Catálogo (Sección 17: L748)', () => {
@@ -213,6 +215,118 @@ describe('MOD-09: Catálogo y Mi Tienda - Lógica de Dominio y UI', () => {
       expect(pricing.baseBoxPriceBs).toBeNull();
       expect(pricing.unitPriceBs).toBeNull();
       expect(pricing.salePrices).toEqual([]);
+    });
+  });
+
+  describe('MOD-M02: Indicadores de variación de precio en Mi Tienda (REQ-M03)', () => {
+    function computeStoreCardIndicatorState(product: StoreProductDto) {
+      const hasPreviousPrice =
+        product.previousPriceBs !== null && product.baseBoxPriceBs !== null;
+      const isPriceUp =
+        hasPreviousPrice && product.baseBoxPriceBs! > product.previousPriceBs!;
+      const isPriceDown =
+        hasPreviousPrice && product.baseBoxPriceBs! < product.previousPriceBs!;
+      const showPriceIndicator = isPriceUp || isPriceDown;
+
+      const title = showPriceIndicator
+        ? isPriceUp
+          ? `Precio anterior: ${formatBs(product.previousPriceBs!)} (subió)`
+          : `Precio anterior: ${formatBs(product.previousPriceBs!)} (bajó)`
+        : null;
+
+      return {
+        hasPreviousPrice,
+        isPriceUp,
+        isPriceDown,
+        showPriceIndicator,
+        title,
+      };
+    }
+
+    const baseProduct: StoreProductDto = {
+      id: 'sp-1',
+      productId: 'p-1',
+      catalogDisplayName: 'Galletas Maria 24x100g',
+      customName: 'Galletas María',
+      manualPriceBs: null,
+      unitsPerBox: 24,
+      margins: [20],
+      position: 0,
+      baseBoxPriceBs: 1500,
+      previousPriceBs: 1200,
+      unitPriceBs: 62.5,
+      salePrices: [{ marginPercent: 20, salePriceBs: 75 }],
+    };
+
+    it('detecta aumento de precio por caja en Mi Tienda (rojo / subió)', () => {
+      const state = computeStoreCardIndicatorState(baseProduct);
+
+      expect(state.showPriceIndicator).toBe(true);
+      expect(state.isPriceUp).toBe(true);
+      expect(state.isPriceDown).toBe(false);
+      expect(state.title).toBe(`Precio anterior: ${formatBs(1200)} (subió)`);
+    });
+
+    it('detecta disminución de precio por caja en Mi Tienda (verde / bajó)', () => {
+      const state = computeStoreCardIndicatorState({
+        ...baseProduct,
+        baseBoxPriceBs: 1000,
+        previousPriceBs: 1200,
+      });
+
+      expect(state.showPriceIndicator).toBe(true);
+      expect(state.isPriceUp).toBe(false);
+      expect(state.isPriceDown).toBe(true);
+      expect(state.title).toBe(`Precio anterior: ${formatBs(1200)} (bajó)`);
+    });
+
+    it('respeta precio manual para la variación si fue fijado', () => {
+      // Si el catálogo marcaba 1200 en la lista anterior, pero el dueño fijó manual a 1400:
+      const state = computeStoreCardIndicatorState({
+        ...baseProduct,
+        manualPriceBs: 1400,
+        baseBoxPriceBs: 1400,
+        previousPriceBs: 1200,
+      });
+
+      expect(state.showPriceIndicator).toBe(true);
+      expect(state.isPriceUp).toBe(true);
+    });
+
+    it('no muestra indicador si el precio por caja no varió', () => {
+      const state = computeStoreCardIndicatorState({
+        ...baseProduct,
+        baseBoxPriceBs: 1200,
+        previousPriceBs: 1200,
+      });
+
+      expect(state.showPriceIndicator).toBe(false);
+      expect(state.isPriceUp).toBe(false);
+      expect(state.isPriceDown).toBe(false);
+      expect(state.title).toBeNull();
+    });
+
+    it('no muestra indicador si el producto no tiene precio anterior (previousPriceBs: null)', () => {
+      const state = computeStoreCardIndicatorState({
+        ...baseProduct,
+        previousPriceBs: null,
+      });
+
+      expect(state.showPriceIndicator).toBe(false);
+      expect(state.isPriceUp).toBe(false);
+      expect(state.isPriceDown).toBe(false);
+    });
+
+    it('no muestra indicador si el producto está "Sin precio" (baseBoxPriceBs: null)', () => {
+      const state = computeStoreCardIndicatorState({
+        ...baseProduct,
+        baseBoxPriceBs: null,
+        previousPriceBs: 1200,
+      });
+
+      expect(state.showPriceIndicator).toBe(false);
+      expect(state.isPriceUp).toBe(false);
+      expect(state.isPriceDown).toBe(false);
     });
   });
 });

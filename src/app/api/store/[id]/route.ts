@@ -7,6 +7,10 @@ import {
 import { resolveStoreProductPricing } from '@/lib/domain/pricing';
 import { storeProductInputSchema } from '@/lib/domain/validations';
 import { MESSAGES } from '@/lib/i18n/messages';
+import {
+  fetchUploadPricesMap,
+  resolvePreviousPricesMap,
+} from '@/lib/supabase/catalog-queries';
 import type { StoreProductDto } from '@/types/contracts';
 
 export const dynamic = 'force-dynamic';
@@ -97,8 +101,10 @@ export async function PATCH(
       updatedRow = updated;
     }
 
-    // 3. Consultar precio de catálogo en la carga activa
+    // 3. Consultar precio de catálogo en la carga activa y carga anterior
     let catalogPriceBs: number | null = null;
+    let previousPriceBs: number | null = null;
+
     const { data: settings } = await supabase
       .from('workspace_settings')
       .select('active_upload_id')
@@ -106,15 +112,22 @@ export async function PATCH(
       .maybeSingle();
 
     if (settings?.active_upload_id) {
-      const { data: priceRow } = await supabase
-        .from('product_prices')
-        .select('box_price_bs')
-        .eq('upload_id', settings.active_upload_id)
-        .eq('product_id', updatedRow.product_id)
+      const { data: activeUpload } = await supabase
+        .from('pdf_uploads')
+        .select('id, price_list_date')
+        .eq('id', settings.active_upload_id)
         .maybeSingle();
 
-      if (priceRow) {
-        catalogPriceBs = Number(priceRow.box_price_bs);
+      if (activeUpload && activeUpload.price_list_date) {
+        const priceMap = await fetchUploadPricesMap(supabase, activeUpload.id, [updatedRow.product_id]);
+        catalogPriceBs = priceMap.get(updatedRow.product_id) ?? null;
+
+        const prevMap = await resolvePreviousPricesMap(
+          supabase,
+          { id: activeUpload.id, price_list_date: activeUpload.price_list_date },
+          [updatedRow.product_id]
+        );
+        previousPriceBs = prevMap.get(updatedRow.product_id) ?? null;
       }
     }
 
@@ -145,6 +158,7 @@ export async function PATCH(
       margins: parsedMargins,
       position: Number(updatedRow.position),
       baseBoxPriceBs: pricing.baseBoxPriceBs,
+      previousPriceBs,
       unitPriceBs: pricing.unitPriceBs,
       salePrices: pricing.salePrices,
     };

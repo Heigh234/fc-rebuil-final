@@ -32,7 +32,7 @@ import { toast } from 'sonner';
 
 import { apiClient, ApiClientError } from '@/lib/api/client';
 import { MESSAGES } from '@/lib/i18n/messages';
-import { formatBs, formatLineAmount } from '@/lib/domain/format';
+import { formatBs } from '@/lib/domain/format';
 import { calculateListSummary, roundHalfUp2 } from '@/lib/domain/pricing';
 import { ReorderControls } from '@/components/shared/reorder-controls';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
@@ -112,15 +112,17 @@ function SortableListItem({
           <h3 className="font-bold text-sm text-[#292524] break-words">
             {item.productName}
           </h3>
-          <p className="text-xs text-[#78716C] mt-0.5">
-            {item.boxPriceBs !== null ? (
-              <span>Precio por caja: {formatBs(item.boxPriceBs)}</span>
-            ) : (
+          {item.boxPriceBs === null ? (
+            <p className="text-xs text-[#78716C] mt-0.5">
               <span className="font-semibold text-[#DC2626] bg-[#FEE2E2] px-1.5 py-0.5 rounded">
                 {MESSAGES.PRICELESS}
               </span>
-            )}
-          </p>
+            </p>
+          ) : item.currencyTag === 'VES' ? (
+            <p className="text-xs text-[#78716C] mt-0.5">
+              <span>Precio por caja: {formatBs(item.boxPriceBs)}</span>
+            </p>
+          ) : null}
         </div>
 
         <button
@@ -199,14 +201,20 @@ function SortableListItem({
           </button>
         </div>
 
-        {/* Total de línea */}
+        {/* Total de línea (solo para VES; en USD solo se muestra la etiqueta USD sin precio) */}
         <div className="text-right ml-auto">
-          <span className="block text-[10px] text-[#78716C]">Total línea</span>
-          <span className="font-bold text-sm text-[#292524]">
-            {item.lineTotalBs !== null
-              ? formatLineAmount(item.lineTotalBs, item.currencyTag)
-              : '—'}
-          </span>
+          {item.currencyTag === 'USD' ? (
+            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-[#E0E7FF] text-[#3730A3]">
+              USD
+            </span>
+          ) : (
+            <>
+              <span className="block text-[10px] text-[#78716C]">Total línea</span>
+              <span className="font-bold text-sm text-[#292524]">
+                {item.lineTotalBs !== null ? formatBs(item.lineTotalBs) : '—'}
+              </span>
+            </>
+          )}
         </div>
       </div>
     </div>

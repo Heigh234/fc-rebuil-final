@@ -11,6 +11,7 @@ import {
 } from '@/lib/domain/pricing';
 import { getDefaultShoppingListName } from '@/lib/domain/format';
 import { shoppingListInputSchema } from '@/lib/domain/validations';
+import { fetchUploadPricesMap } from '@/lib/supabase/catalog-queries';
 import type {
   ShoppingListSummaryDto,
   ShoppingListStatus,
@@ -85,7 +86,7 @@ export async function GET() {
 
     // 4. Si hay listas abiertas, consultar datos de la tienda y precios activos para resolver en vivo
     const storeMap = new Map<string, { customName: string; manualPriceBs: number | null }>();
-    const catalogPriceMap = new Map<string, number>();
+    let catalogPriceMap = new Map<string, number>();
 
     if (openLists.length > 0) {
       const { data: storeProducts } = await supabase
@@ -100,14 +101,19 @@ export async function GET() {
       }
 
       if (activeUploadId) {
-        const { data: activePrices } = await supabase
-          .from('product_prices')
-          .select('product_id, box_price_bs')
-          .eq('upload_id', activeUploadId);
+        const openProductIds = Array.from(
+          new Set(
+            openLists
+              .flatMap((l) => itemsByListId.get(l.id) ?? [])
+              .map((it) => it.product_id)
+          )
+        );
 
-        for (const ap of activePrices ?? []) {
-          catalogPriceMap.set(ap.product_id, Number(ap.box_price_bs));
-        }
+        catalogPriceMap = await fetchUploadPricesMap(
+          supabase,
+          activeUploadId,
+          openProductIds
+        );
       }
     }
 

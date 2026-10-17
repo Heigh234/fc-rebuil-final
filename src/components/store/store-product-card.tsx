@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 import type { StoreProductDto } from '@/types/contracts';
 import { ReorderControls } from '@/components/shared/reorder-controls';
 import { formatBs, formatMarginPercent } from '@/lib/domain/format';
@@ -29,6 +30,13 @@ export function StoreProductCard({
   onEdit,
   onAddToList,
 }: StoreProductCardProps) {
+  const hasPreviousPrice =
+    product.previousPriceBs !== null && product.baseBoxPriceBs !== null;
+  const isPriceUp =
+    hasPreviousPrice && product.baseBoxPriceBs! > product.previousPriceBs!;
+  const isPriceDown =
+    hasPreviousPrice && product.baseBoxPriceBs! < product.previousPriceBs!;
+  const showPriceIndicator = isPriceUp || isPriceDown;
   return (
     <div
       role="button"
@@ -65,26 +73,53 @@ export function StoreProductCard({
       </div>
 
       {/* Precios: Base por caja, Por unidad y Precios de venta */}
-      <div className="flex flex-col gap-1 text-sm">
-        {/* Precio por caja */}
-        <div className="flex items-center justify-between text-[#78716C]">
-          <span>Por caja:</span>
-          {product.baseBoxPriceBs !== null ? (
-            <span className="font-semibold text-[#292524] tabular-nums">
-              {formatBs(product.baseBoxPriceBs)}
-            </span>
-          ) : (
-            <span className="text-[#78716C] font-semibold text-xs px-2 py-0.5 bg-[#F2EDE4] rounded-md">
-              {MESSAGES.PRICELESS}
-            </span>
+      <div className="flex flex-col gap-1.5 text-base">
+        {/* Precio por caja + Indicador de variación */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="inline-flex items-baseline gap-1.5 text-[#78716C]">
+            <span>Por caja:</span>
+            {product.baseBoxPriceBs !== null ? (
+              <span className="font-bold text-[#292524] tabular-nums">
+                {formatBs(product.baseBoxPriceBs)}
+              </span>
+            ) : (
+              <span className="text-[#78716C] font-semibold text-xs px-2 py-0.5 bg-[#F2EDE4] rounded-md">
+                {MESSAGES.PRICELESS}
+              </span>
+            )}
+          </div>
+
+          {showPriceIndicator && (
+            <div
+              className={`inline-flex items-center gap-1 text-xs font-bold tabular-nums ${
+                isPriceUp ? 'text-[#DC2626]' : 'text-[#16A34A]'
+              }`}
+              title={
+                isPriceUp
+                  ? `Precio anterior: ${formatBs(product.previousPriceBs!)} (subió)`
+                  : `Precio anterior: ${formatBs(product.previousPriceBs!)} (bajó)`
+              }
+            >
+              {isPriceUp ? (
+                <>
+                  <TrendingUp className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                  <span>{formatBs(product.previousPriceBs!)}</span>
+                </>
+              ) : (
+                <>
+                  <TrendingDown className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                  <span>{formatBs(product.previousPriceBs!)}</span>
+                </>
+              )}
+            </div>
           )}
         </div>
 
         {/* Precio por unidad */}
         {product.unitPriceBs !== null && (
-          <div className="flex items-center justify-between text-[#78716C]">
+          <div className="flex items-baseline gap-1.5 text-[#78716C] flex-wrap">
             <span>Por unidad:</span>
-            <span className="font-semibold text-[#292524] tabular-nums">
+            <span className="font-bold text-[#292524] tabular-nums">
               {formatBs(product.unitPriceBs)}
             </span>
           </div>
@@ -96,14 +131,14 @@ export function StoreProductCard({
             {product.salePrices.map((sp, idx) => (
               <div
                 key={idx}
-                className="flex items-center justify-between text-xs text-[#78716C]"
+                className="flex items-baseline gap-1.5 text-base text-[#78716C] flex-wrap"
               >
                 <span>
                   {MESSAGES.previewSalePriceWithMargin(
                     formatMarginPercent(sp.marginPercent).replace('%', '')
                   )}:
                 </span>
-                <span className="font-bold text-[#2D6A4F] tabular-nums">
+                <span className="font-extrabold text-[#2D6A4F] tabular-nums">
                   {formatBs(sp.salePriceBs)}
                 </span>
               </div>

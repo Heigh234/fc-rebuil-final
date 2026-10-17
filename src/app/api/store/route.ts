@@ -9,6 +9,10 @@ import {
 import { resolveStoreProductPricing } from '@/lib/domain/pricing';
 import { createStoreProductSchema } from '@/lib/domain/validations';
 import { MESSAGES } from '@/lib/i18n/messages';
+import {
+  fetchUploadPricesMap,
+  resolvePreviousPricesMap,
+} from '@/lib/supabase/catalog-queries';
 import type { StoreProductDto } from '@/types/contracts';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +28,21 @@ export async function GET() {
       .eq('singleton_key', true)
       .maybeSingle();
 
-    const activeUploadId = settings?.active_upload_id;
+    let activeUpload: { id: string; price_list_date: string } | null = null;
+    if (settings?.active_upload_id) {
+      const { data: uploadData } = await supabase
+        .from('pdf_uploads')
+        .select('id, price_list_date')
+        .eq('id', settings.active_upload_id)
+        .maybeSingle();
+
+      if (uploadData && uploadData.price_list_date) {
+        activeUpload = {
+          id: uploadData.id,
+          price_list_date: uploadData.price_list_date,
+        };
+      }
+    }
 
     // 2. Obtener los productos de Mi tienda ordenados por position ASC y created_at ASC
     const { data: storeRows, error: storeError } = await supabase
@@ -54,22 +72,18 @@ export async function GET() {
       return jsonSuccess<StoreProductDto[]>([]);
     }
 
-    // 3. Obtener precios del catálogo activo para los productos en la tienda
-    const priceMap = new Map<string, number>();
+    // 3. Obtener precios del catálogo activo y precio anterior para los productos en la tienda
+    const productIds = storeRows.map((r) => r.product_id);
+    let priceMap = new Map<string, number>();
+    let previousPriceMap = new Map<string, number>();
 
-    if (activeUploadId) {
-      const productIds = storeRows.map((r) => r.product_id);
-      const { data: prices, error: pricesError } = await supabase
-        .from('product_prices')
-        .select('product_id, box_price_bs')
-        .eq('upload_id', activeUploadId)
-        .in('product_id', productIds);
-
-      if (!pricesError && prices) {
-        prices.forEach((p) => {
-          priceMap.set(p.product_id, Number(p.box_price_bs));
-        });
-      }
+    if (activeUpload) {
+      priceMap = await fetchUploadPricesMap(supabase, activeUpload.id, productIds);
+      previousPriceMap = await resolvePreviousPricesMap(
+        supabase,
+        activeUpload,
+        productIds
+      );
     }
 
     // 4. Mapear y calcular precios dinámicos (precio base, precio unitario y márgenes)
@@ -100,6 +114,7 @@ export async function GET() {
         margins: parsedMargins,
         position: Number(r.position),
         baseBoxPriceBs: pricing.baseBoxPriceBs,
+        previousPriceBs: previousPriceMap.get(r.product_id) ?? null,
         unitPriceBs: pricing.unitPriceBs,
         salePrices: pricing.salePrices,
       };
@@ -174,8 +189,10 @@ export async function POST(request: Request) {
       throw insertError;
     }
 
-    // 5. Consultar precio en carga activa para respuesta inmediata
+    // 5. Consultar precio en carga activa y carga anterior para respuesta inmediata
     let catalogPriceBs: number | null = null;
+    let previousPriceBs: number | null = null;
+
     const { data: settings } = await supabase
       .from('workspace_settings')
       .select('active_upload_id')
@@ -183,15 +200,22 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (settings?.active_upload_id) {
-      const { data: priceRow } = await supabase
-        .from('product_prices')
-        .select('box_price_bs')
-        .eq('upload_id', settings.active_upload_id)
-        .eq('product_id', productId)
+      const { data: activeUpload } = await supabase
+        .from('pdf_uploads')
+        .select('id, price_list_date')
+        .eq('id', settings.active_upload_id)
         .maybeSingle();
 
-      if (priceRow) {
-        catalogPriceBs = Number(priceRow.box_price_bs);
+      if (activeUpload && activeUpload.price_list_date) {
+        const priceMap = await fetchUploadPricesMap(supabase, activeUpload.id, [productId]);
+        catalogPriceBs = priceMap.get(productId) ?? null;
+
+        const prevMap = await resolvePreviousPricesMap(
+          supabase,
+          { id: activeUpload.id, price_list_date: activeUpload.price_list_date },
+          [productId]
+        );
+        previousPriceBs = prevMap.get(productId) ?? null;
       }
     }
 
@@ -212,6 +236,7 @@ export async function POST(request: Request) {
       margins,
       position: Number(inserted.position),
       baseBoxPriceBs: pricing.baseBoxPriceBs,
+      previousPriceBs,
       unitPriceBs: pricing.unitPriceBs,
       salePrices: pricing.salePrices,
     };

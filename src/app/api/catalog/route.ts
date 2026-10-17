@@ -1,6 +1,11 @@
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { jsonSuccess, handleApiError } from '@/lib/api/http-error';
 import type { CatalogProductDto } from '@/types/contracts';
+import {
+  fetchAllUploadPricesWithProducts,
+  resolvePreviousPricesMap,
+  POSTGREST_PAGE_SIZE,
+} from '@/lib/supabase/catalog-queries';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,91 +46,50 @@ export async function GET() {
       return jsonSuccess<CatalogProductDto[]>([]);
     }
 
-    // 4. Consultar precios y productos de la carga activa
-    const { data: currentPrices, error: currentPricesError } = await supabase
-      .from('product_prices')
-      .select(`
-        product_id,
-        box_price_bs,
-        products!inner (
-          id,
-          source_name,
-          display_name
-        )
-      `)
-      .eq('upload_id', activeUpload.id)
-      .limit(5000);
-
-    if (currentPricesError) {
-      throw currentPricesError;
-    }
+    // 4. Consultar precios y productos de la carga activa con paginación determinística
+    const currentPrices = await fetchAllUploadPricesWithProducts(
+      supabase,
+      activeUpload.id
+    );
 
     if (!currentPrices || currentPrices.length === 0) {
       return jsonSuccess<CatalogProductDto[]>([]);
     }
 
-    // 5. Consultar productos existentes en Mi tienda (inStore)
-    const { data: storeProducts, error: storeError } = await supabase
-      .from('store_products')
-      .select('product_id')
-      .limit(5000);
+    // 5. Consultar productos existentes en Mi tienda (inStore) con paginación determinística
+    const storeProductIds = new Set<string>();
+    let storeOffset = 0;
+    while (true) {
+      const { data: storeRows, error: storeError } = await supabase
+        .from('store_products')
+        .select('product_id')
+        .order('id', { ascending: true })
+        .range(storeOffset, storeOffset + POSTGREST_PAGE_SIZE - 1);
 
-    if (storeError) {
-      throw storeError;
+      if (storeError) {
+        throw storeError;
+      }
+
+      if (!storeRows || storeRows.length === 0) {
+        break;
+      }
+
+      for (const sp of storeRows) {
+        storeProductIds.add(sp.product_id);
+      }
+
+      if (storeRows.length < POSTGREST_PAGE_SIZE) {
+        break;
+      }
+
+      storeOffset += POSTGREST_PAGE_SIZE;
     }
-
-    const storeProductIds = new Set((storeProducts ?? []).map((sp) => sp.product_id));
 
     // 6. Consultar cargas candidatas para el cálculo de "precio anterior" (Sección 8: L325)
-    // Cargas distintas de la activa, aplicadas o no aplicadas, con fecha <= fecha activa,
-    // ordenadas por fecha de lista DESC y created_at DESC (desempate de subida más reciente).
-    const { data: candidateUploads, error: candidatesError } = await supabase
-      .from('pdf_uploads')
-      .select('id, price_list_date, created_at')
-      .in('status', ['applied', 'not_applied'])
-      .neq('id', activeUpload.id)
-      .lte('price_list_date', activeUpload.price_list_date)
-      .order('price_list_date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (candidatesError) {
-      throw candidatesError;
-    }
-
-    const previousPriceMap = new Map<string, number>();
-
-    if (candidateUploads && candidateUploads.length > 0) {
-      const candidateUploadIds = candidateUploads.map((u) => u.id);
-      const uploadRankMap = new Map<string, number>();
-      candidateUploadIds.forEach((id, index) => uploadRankMap.set(id, index));
-
-      // Consultar precios de las cargas candidatas sin filtrar por product_id para evitar
-      // que la URL de PostgREST exceda el límite HTTP (414 URI Too Long) con más de 1000 UUIDs.
-      const { data: historicalPrices, error: histError } = await supabase
-        .from('product_prices')
-        .select('product_id, upload_id, box_price_bs')
-        .in('upload_id', candidateUploadIds)
-        .limit(20000);
-
-      if (histError) {
-        throw histError;
-      }
-
-      // Para cada producto, conservar el precio de la carga candidata de mayor prioridad (menor rank)
-      const bestRankByProduct = new Map<string, number>();
-
-      for (const hp of historicalPrices ?? []) {
-        const rank = uploadRankMap.get(hp.upload_id);
-        if (rank === undefined) continue;
-
-        const currentBestRank = bestRankByProduct.get(hp.product_id);
-        if (currentBestRank === undefined || rank < currentBestRank) {
-          bestRankByProduct.set(hp.product_id, rank);
-          previousPriceMap.set(hp.product_id, Number(hp.box_price_bs));
-        }
-      }
-    }
+    const previousPriceMap = await resolvePreviousPricesMap(supabase, {
+      id: activeUpload.id,
+      price_list_date: activeUpload.price_list_date,
+    });
 
     // 7. Construir DTOs del catálogo
     const catalog: CatalogProductDto[] = currentPrices.map((cp) => {
