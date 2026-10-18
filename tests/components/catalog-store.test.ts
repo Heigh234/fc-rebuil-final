@@ -1,9 +1,12 @@
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, it, expect } from 'vitest';
 import { matchesMultiWordQuery } from '@/lib/domain/search';
 import { resolveStoreProductPricing } from '@/lib/domain/pricing';
 import { storeProductInputSchema } from '@/lib/domain/validations';
 import { formatBs } from '@/lib/domain/format';
 import { MESSAGES } from '@/lib/i18n/messages';
+import { StoreProductCard } from '@/components/store/store-product-card';
 import type { StoreProductDto } from '@/types/contracts';
 
 describe('MOD-09: Catálogo y Mi Tienda - Lógica de Dominio y UI', () => {
@@ -327,6 +330,73 @@ describe('MOD-09: Catálogo y Mi Tienda - Lógica de Dominio y UI', () => {
       expect(state.showPriceIndicator).toBe(false);
       expect(state.isPriceUp).toBe(false);
       expect(state.isPriceDown).toBe(false);
+    });
+  });
+
+  describe('Renderizado SSR de StoreProductCard con renderToStaticMarkup (HALL-07)', () => {
+    const cardProduct: StoreProductDto = {
+      id: 'store-p-1',
+      productId: 'p-1',
+      catalogDisplayName: 'Arroz Primor 1kg',
+      customName: 'Arroz Blanco Familiar',
+      manualPriceBs: null,
+      unitsPerBox: 24,
+      margins: [20, 30],
+      position: 0,
+      baseBoxPriceBs: 1200,
+      previousPriceBs: 1000,
+      unitPriceBs: 50,
+      salePrices: [
+        { marginPercent: 20, salePriceBs: 60 },
+        { marginPercent: 30, salePriceBs: 65 },
+      ],
+    };
+
+    it('renderiza correctamente el marcado estático con datos de precio por caja, unidad y márgenes', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(StoreProductCard, {
+          product: cardProduct,
+          index: 0,
+          total: 1,
+          showReorderControls: false,
+          onMoveUp: () => {},
+          onMoveDown: () => {},
+          dragHandleProps: {},
+          onEdit: () => {},
+          onAddToList: () => {},
+        })
+      );
+
+      expect(html).toContain('Arroz Blanco Familiar');
+      expect(html).toContain('Por caja:');
+      expect(html).toContain('Por unidad:');
+      expect(html).toContain('Venta con 20%:');
+      expect(html).toContain('Venta con 30%:');
+      expect(html).toContain('text-[#DC2626]'); // Flecha roja de aumento
+    });
+
+    it('renderiza indicador verde cuando el precio baja', () => {
+      const downProduct: StoreProductDto = {
+        ...cardProduct,
+        baseBoxPriceBs: 900,
+        previousPriceBs: 1000,
+      };
+
+      const html = renderToStaticMarkup(
+        React.createElement(StoreProductCard, {
+          product: downProduct,
+          index: 0,
+          total: 1,
+          showReorderControls: false,
+          onMoveUp: () => {},
+          onMoveDown: () => {},
+          dragHandleProps: {},
+          onEdit: () => {},
+          onAddToList: () => {},
+        })
+      );
+
+      expect(html).toContain('text-[#16A34A]'); // Flecha verde de bajada
     });
   });
 });

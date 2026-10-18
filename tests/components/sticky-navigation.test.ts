@@ -5,6 +5,7 @@ import { AppHeader } from '@/components/layout/app-header';
 import { TabNavigation } from '@/components/layout/tab-navigation';
 import { ActiveUploadBanner } from '@/components/layout/active-upload-banner';
 import { CatalogTab } from '@/components/catalog/catalog-tab';
+import { StoreTab } from '@/components/store/store-tab';
 import { MESSAGES } from '@/lib/i18n/messages';
 
 describe('MOD-S01: Interruptor Global de Fijación en Scroll (Pestañas y Buscador)', () => {
@@ -110,6 +111,20 @@ describe('MOD-S01: Interruptor Global de Fijación en Scroll (Pestañas y Buscad
 
       expect(html).toContain('placeholder="Buscar productos..."');
       expect(html).toContain('sticky top-28 z-20');
+    });
+  });
+
+  describe('StoreTab — Render inicial SSR (HALL-07 / REQ-S02)', () => {
+    it('renderiza sin errores en SSR estático', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(StoreTab, {
+          onNavigateToCatalog: () => {},
+          onOpenAddToList: () => {},
+          isStickySearch: false,
+        })
+      );
+
+      expect(html).toContain('animate-pulse'); // CardSkeleton en estado de carga inicial
     });
   });
 });

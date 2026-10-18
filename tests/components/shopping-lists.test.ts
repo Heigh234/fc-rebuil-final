@@ -1,8 +1,11 @@
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, it, expect } from 'vitest';
 import { calculateListSummary } from '@/lib/domain/pricing';
 import { formatCaracasDate, getDefaultShoppingListName, formatBs } from '@/lib/domain/format';
 import { MESSAGES } from '@/lib/i18n/messages';
-import type { InvoiceLineDto, CurrencyTag, ShoppingListItemDto } from '@/types/contracts';
+import { InvoiceView } from '@/components/lists/invoice-view';
+import type { InvoiceLineDto, CurrencyTag, ShoppingListItemDto, InvoiceDto } from '@/types/contracts';
 
 describe('MOD-10: Listas de Compras, Detalle, Finalización y Facturas', () => {
   describe('Cálculo de Totales y Resumen (Sección 9: L378-L385 y Sección 11: L469-L470)', () => {
@@ -270,6 +273,55 @@ describe('MOD-10: Listas de Compras, Detalle, Finalización y Facturas', () => {
       expect(display.topRowHasUsdBadge).toBe(true);
       expect(display.bottomRowDetailText).toBe('1 caja'); // Sin '× 30 Bs'
       expect(display.bottomRowHasVesBadge).toBe(false);
+    });
+  });
+
+  describe('Renderizado SSR de InvoiceView con renderToStaticMarkup (HALL-07)', () => {
+    const mockInvoice: InvoiceDto = {
+      id: 'inv-1',
+      listId: 'list-1',
+      listName: 'Lista de Compras Central',
+      finalizedAt: '2026-10-18T10:00:00Z',
+      priceListDate: '2026-10-18',
+      bcvRate: 45.5,
+      totalBs: 400,
+      hasUsdLines: true,
+      lines: [
+        {
+          id: 'inv-line-1',
+          productName: 'Harina PAN 1kg',
+          quantity: 5,
+          boxPriceBs: 80,
+          currencyTag: 'VES',
+          lineTotalBs: 400,
+          position: 0,
+        },
+        {
+          id: 'inv-line-2',
+          productName: 'Aceite de Oliva 500ml',
+          quantity: 1,
+          boxPriceBs: 30,
+          currencyTag: 'USD',
+          lineTotalBs: 30,
+          position: 1,
+        },
+      ],
+    };
+
+    it('renderiza correctamente el marcado de factura con totales en Bs y línea USD sin precio Bs', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(InvoiceView, {
+          invoice: mockInvoice,
+          onBack: () => {},
+        })
+      );
+
+      expect(html).toContain('Lista de Compras Central');
+      expect(html).toContain('Harina PAN 1kg');
+      expect(html).toContain('Aceite de Oliva 500ml');
+      expect(html).toContain('1 caja');
+      expect(html).not.toContain('× 30,00 Bs');
+      expect(html).toContain('USD');
     });
   });
 });
