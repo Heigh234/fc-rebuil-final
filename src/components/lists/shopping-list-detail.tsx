@@ -39,6 +39,7 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { CardSkeleton } from '@/components/shared/card-skeleton';
 import { ErrorRetryState } from '@/components/shared/error-retry-state';
+import { useSilentPolling } from '@/hooks/use-silent-polling';
 import type {
   ShoppingListDetailDto,
   ShoppingListItemDto,
@@ -246,6 +247,9 @@ export function ShoppingListDetail({
   const [itemToDelete, setItemToDelete] = useState<ShoppingListItemDto | null>(null);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
 
+  // Estado de arrastre en curso para pausar sincronización
+  const [isDragging, setIsDragging] = useState(false);
+
   // Sensores de arrastre @dnd-kit
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -259,9 +263,11 @@ export function ShoppingListDetail({
   );
 
   // Cargar detalle de la lista
-  const loadDetail = useCallback(async () => {
+  const loadDetail = useCallback(async (silent = false) => {
     try {
-      setError(null);
+      if (!silent) {
+        setError(null);
+      }
       const data = await apiClient.getShoppingListDetail(listId);
 
       // Si la lista ya fue finalizada por otro dispositivo o proceso previo, redirigir a factura (L1051)
@@ -281,17 +287,35 @@ export function ShoppingListDetail({
       ) {
         toast.error(MESSAGES.LIST_NOT_FOUND);
         onBack();
-      } else {
+      } else if (!silent) {
         setError(MESSAGES.GENERIC_FETCH_ERROR);
       }
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   }, [listId, onFinalized, onBack]);
 
   useEffect(() => {
     loadDetail();
   }, [loadDetail]);
+
+  // Sincronización periódica multi-dispositivo (pausada durante cualquier interacción activa)
+  useSilentPolling(() => loadDetail(true), {
+    intervalMs: 30_000,
+    paused:
+      isLoading ||
+      isEditingName ||
+      isSavingName ||
+      isConfirmDeleteListOpen ||
+      isDeletingList ||
+      isConfirmFinalizeOpen ||
+      isFinalizing ||
+      itemToDelete !== null ||
+      isDeletingItem ||
+      isDragging,
+  });
 
   // Guardar edición del nombre de la lista (L467, L770)
   const handleSaveName = async () => {
@@ -322,6 +346,7 @@ export function ShoppingListDetail({
 
   // Reordenamiento por arrastre (@dnd-kit)
   const handleDragEnd = async (event: DragEndEvent) => {
+    setIsDragging(false);
     if (!list) return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -634,6 +659,8 @@ export function ShoppingListDetail({
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          onDragStart={() => setIsDragging(true)}
+          onDragCancel={() => setIsDragging(false)}
           onDragEnd={handleDragEnd}
         >
           <SortableContext

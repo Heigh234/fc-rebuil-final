@@ -10,6 +10,7 @@ import { formatBs, formatCaracasDate } from '@/lib/domain/format';
 import { EmptyState } from '@/components/shared/empty-state';
 import { CardSkeleton } from '@/components/shared/card-skeleton';
 import { ErrorRetryState } from '@/components/shared/error-retry-state';
+import { useSilentPolling } from '@/hooks/use-silent-polling';
 import type { ShoppingListSummaryDto } from '@/types/contracts';
 
 export interface ShoppingListsTabProps {
@@ -28,22 +29,34 @@ export function ShoppingListsTab({
   const [error, setError] = useState<string | null>(null);
   const [isCreating, setIsCreatingList] = useState(false);
 
-  const fetchLists = useCallback(async () => {
+  const fetchLists = useCallback(async (silent = false) => {
     try {
-      setError(null);
+      if (!silent) {
+        setError(null);
+      }
       const data = await apiClient.getShoppingLists();
       setLists(data);
     } catch (err) {
       console.error('[ShoppingListsTab Fetch Error]', err);
-      setError(MESSAGES.GENERIC_FETCH_ERROR);
+      if (!silent) {
+        setError(MESSAGES.GENERIC_FETCH_ERROR);
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     fetchLists();
   }, [fetchLists, refreshTrigger]);
+
+  // Sincronización periódica multi-dispositivo (pausada durante carga o creación de lista)
+  useSilentPolling(() => fetchLists(true), {
+    intervalMs: 30_000,
+    paused: isLoading || isCreating,
+  });
 
   // Separar en secciones: abiertas y finalizadas con las más recientes arriba (Sección 17: L761)
   const { openLists, finalizedLists } = useMemo(() => {
