@@ -5,7 +5,7 @@ import {
   handleApiError,
 } from '@/lib/api/http-error';
 import { resolveStoreProductPricing } from '@/lib/domain/pricing';
-import { storeProductInputSchema } from '@/lib/domain/validations';
+import { storeProductInputSchema, isValidUuid } from '@/lib/domain/validations';
 import { MESSAGES } from '@/lib/i18n/messages';
 import {
   fetchUploadPricesMap,
@@ -21,6 +21,11 @@ export async function PATCH(
 ) {
   try {
     const { id } = await context.params;
+
+    if (!isValidUuid(id)) {
+      return notFound(MESSAGES.PRODUCT_NOT_IN_STORE);
+    }
+
     const rawBody = await request.json().catch(() => null);
 
     // Permitir actualización parcial
@@ -177,6 +182,11 @@ export async function DELETE(
 ) {
   try {
     const { id } = await context.params;
+
+    if (!isValidUuid(id)) {
+      return notFound(MESSAGES.PRODUCT_NOT_IN_STORE);
+    }
+
     const supabase = createServiceRoleClient();
 
     // 1. Verificar existencia
