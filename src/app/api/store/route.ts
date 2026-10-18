@@ -12,6 +12,7 @@ import { MESSAGES } from '@/lib/i18n/messages';
 import {
   fetchUploadPricesMap,
   resolvePreviousPricesMap,
+  fetchAllStoreProductsWithCatalog,
 } from '@/lib/supabase/catalog-queries';
 import type { StoreProductDto } from '@/types/contracts';
 
@@ -44,29 +45,8 @@ export async function GET() {
       }
     }
 
-    // 2. Obtener los productos de Mi tienda ordenados por position ASC y created_at ASC
-    const { data: storeRows, error: storeError } = await supabase
-      .from('store_products')
-      .select(`
-        id,
-        product_id,
-        custom_name,
-        manual_price_bs,
-        units_per_box,
-        margins,
-        position,
-        products!inner (
-          id,
-          display_name,
-          source_name
-        )
-      `)
-      .order('position', { ascending: true })
-      .order('created_at', { ascending: true });
-
-    if (storeError) {
-      throw storeError;
-    }
+    // 2. Obtener los productos de Mi tienda paginando determinísticamente (CONT-REM-01)
+    const storeRows = await fetchAllStoreProductsWithCatalog(supabase);
 
     if (!storeRows || storeRows.length === 0) {
       return jsonSuccess<StoreProductDto[]>([]);
