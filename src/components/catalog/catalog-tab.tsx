@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { EmptyState } from '@/components/shared/empty-state';
 import { CardSkeleton } from '@/components/shared/card-skeleton';
 import { ErrorRetryState } from '@/components/shared/error-retry-state';
+import { useSilentPolling } from '@/hooks/use-silent-polling';
 import { CatalogProductCard } from './catalog-product-card';
 import { PriceHistorySheet } from './price-history-sheet';
 import { apiClient, ApiClientError } from '@/lib/api/client';
@@ -44,18 +45,24 @@ export function CatalogTab({
   const [addingProductIds, setAddingProductIds] = useState<Set<string>>(new Set());
 
   // Carga de productos del catálogo activo
-  const loadCatalog = useCallback(async () => {
+  const loadCatalog = useCallback(async (silent = false) => {
     if (!hasActiveUpload) return;
     try {
-      setIsLoading(true);
-      setError(null);
+      if (!silent) {
+        setIsLoading(true);
+        setError(null);
+      }
       const data = await apiClient.getCatalog();
       setCatalog(data);
     } catch (err) {
       console.error('[Catalog Fetch Error]', err);
-      setError(MESSAGES.GENERIC_FETCH_ERROR);
+      if (!silent) {
+        setError(MESSAGES.GENERIC_FETCH_ERROR);
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   }, [hasActiveUpload]);
 
@@ -64,6 +71,12 @@ export function CatalogTab({
       loadCatalog();
     }
   }, [hasActiveUpload, loadCatalog]);
+
+  // Sincronización periódica multi-dispositivo (pausada durante carga inicial, hoja abierta o agregando a tienda)
+  useSilentPolling(() => loadCatalog(true), {
+    intervalMs: 30_000,
+    paused: !hasActiveUpload || isLoading || isHistorySheetOpen || addingProductIds.size > 0,
+  });
 
   // Manejo de apertura/cierre de la hoja de historial de precios
   const handlePriceClick = (product: CatalogProductDto) => {
