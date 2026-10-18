@@ -37,6 +37,7 @@ export interface StoreTabProps {
   onOpenAddToList: (product: StoreProductDto) => void;
   onSheetOpenChange?: (isOpen: boolean) => void;
   onStoreChanged?: () => void;
+  isStickySearch?: boolean;
 }
 
 interface SortableProductItemProps {
@@ -98,6 +99,7 @@ export function StoreTab({
   onOpenAddToList,
   onSheetOpenChange,
   onStoreChanged,
+  isStickySearch = false,
 }: StoreTabProps) {
   const [products, setProducts] = useState<StoreProductDto[]>([]);
   const [catalogPrices, setCatalogPrices] = useState<Record<string, number>>({});
@@ -271,27 +273,35 @@ export function StoreTab({
   return (
     <div className="flex flex-col gap-3">
       {/* Buscador local */}
-      <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#78716C]">
-          <Search className="w-4 h-4" aria-hidden="true" />
+      <div
+        className={
+          isStickySearch
+            ? 'sticky top-28 z-20 bg-[#FFFBF5] py-2 -mx-4 px-4 border-b border-[#E7E0D5] shadow-xs'
+            : ''
+        }
+      >
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#78716C]">
+            <Search className="w-4 h-4" aria-hidden="true" />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar en mi tienda..."
+            className="w-full min-h-[44px] pl-10 pr-10 py-2.5 bg-white border border-[#E7E0D5] rounded-xl text-sm text-[#292524] placeholder-[#78716C] focus:outline-none focus:border-[#2D6A4F] focus:ring-1 focus:ring-[#2D6A4F] transition"
+          />
+          {searchQuery.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              aria-label="Limpiar búsqueda"
+              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#78716C] hover:text-[#292524] transition cursor-pointer"
+            >
+              <X className="w-4 h-4" aria-hidden="true" />
+            </button>
+          )}
         </div>
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Buscar en mi tienda..."
-          className="w-full min-h-[44px] pl-10 pr-10 py-2.5 bg-white border border-[#E7E0D5] rounded-xl text-sm text-[#292524] placeholder-[#78716C] focus:outline-none focus:border-[#2D6A4F] focus:ring-1 focus:ring-[#2D6A4F] transition"
-        />
-        {searchQuery.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setSearchQuery('')}
-            aria-label="Limpiar búsqueda"
-            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#78716C] hover:text-[#292524] transition cursor-pointer"
-          >
-            <X className="w-4 h-4" aria-hidden="true" />
-          </button>
-        )}
       </div>
 
       {/* Lista de productos o mensaje de búsqueda sin resultados */}
