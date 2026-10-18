@@ -7,6 +7,9 @@ import {
   fetchAllUploadPricesWithProducts,
   fetchUploadPricesMap,
   resolvePreviousPricesMap,
+  fetchAllStoreProductsWithCatalog,
+  fetchAllStoreProductsBasic,
+  fetchAllShoppingListItemsWithProducts,
   POSTGREST_PAGE_SIZE,
   POSTGREST_IN_CHUNK_SIZE,
 } from '@/lib/supabase/catalog-queries';
@@ -28,6 +31,8 @@ interface MockQueryState {
 function createMockSupabase(handlers: {
   onSelectProductPrices?: (state: MockQueryState) => { data: unknown[]; error: unknown };
   onSelectPdfUploads?: (state: MockQueryState) => { data: unknown[]; error: unknown };
+  onSelectStoreProducts?: (state: MockQueryState) => { data: unknown[]; error: unknown };
+  onSelectShoppingListItems?: (state: MockQueryState) => { data: unknown[]; error: unknown };
 }) {
   return {
     from: vi.fn((table: string) => {
@@ -87,6 +92,10 @@ function createMockSupabase(handlers: {
             result = handlers.onSelectProductPrices(state);
           } else if (table === 'pdf_uploads' && handlers.onSelectPdfUploads) {
             result = handlers.onSelectPdfUploads(state);
+          } else if (table === 'store_products' && handlers.onSelectStoreProducts) {
+            result = handlers.onSelectStoreProducts(state);
+          } else if (table === 'shopping_list_items' && handlers.onSelectShoppingListItems) {
+            result = handlers.onSelectShoppingListItems(state);
           }
           return Promise.resolve(result).then(resolve, reject);
         },
@@ -363,6 +372,99 @@ describe('MOD-M01: PostgREST Range Pagination & Previous Price Resolution', () =
         storeItemWithoutPreviousPrice.previousPriceBs !== null;
 
       expect(hasVariation).toBe(false);
+    });
+  });
+
+  describe('CONT-REM-01: Paginación determinista en store_products y shopping_list_items', () => {
+    it('fetchAllStoreProductsWithCatalog pagina correctamente más de 1.000 filas con orden determinista', async () => {
+      const totalRows = 1250;
+      const mockRows = Array.from({ length: totalRows }, (_, i) => ({
+        id: `sp-${i + 1}`,
+        product_id: `prod-${i + 1}`,
+        custom_name: `Producto Tienda ${i + 1}`,
+        manual_price_bs: null,
+        units_per_box: 1,
+        margins: [20],
+        position: i,
+        products: { id: `prod-${i + 1}`, display_name: `Catálogo ${i + 1}`, source_name: `SRC ${i + 1}` },
+      }));
+
+      const rangesCalled: [number, number][] = [];
+      const mockSupabase = createMockSupabase({
+        onSelectStoreProducts: (state) => {
+          expect(state.orders).toEqual([
+            { col: 'position', opts: { ascending: true } },
+            { col: 'created_at', opts: { ascending: true } },
+            { col: 'id', opts: { ascending: true } },
+          ]);
+          rangesCalled.push([state.rangeFrom!, state.rangeTo!]);
+          const slice = mockRows.slice(state.rangeFrom!, state.rangeTo! + 1);
+          return { data: slice, error: null };
+        },
+      });
+
+      const result = await fetchAllStoreProductsWithCatalog(mockSupabase);
+      expect(result.length).toBe(1250);
+      expect(rangesCalled).toEqual([
+        [0, 999],
+        [1000, 1999],
+      ]);
+    });
+
+    it('fetchAllStoreProductsBasic pagina correctamente ordenando por id ASC', async () => {
+      const totalRows = 1100;
+      const mockRows = Array.from({ length: totalRows }, (_, i) => ({
+        product_id: `prod-${i + 1}`,
+        custom_name: `Nombre ${i + 1}`,
+        manual_price_bs: 50,
+      }));
+
+      const rangesCalled: [number, number][] = [];
+      const mockSupabase = createMockSupabase({
+        onSelectStoreProducts: (state) => {
+          expect(state.orders).toEqual([{ col: 'id', opts: { ascending: true } }]);
+          rangesCalled.push([state.rangeFrom!, state.rangeTo!]);
+          const slice = mockRows.slice(state.rangeFrom!, state.rangeTo! + 1);
+          return { data: slice, error: null };
+        },
+      });
+
+      const result = await fetchAllStoreProductsBasic(mockSupabase);
+      expect(result.length).toBe(1100);
+      expect(rangesCalled).toEqual([
+        [0, 999],
+        [1000, 1999],
+      ]);
+    });
+
+    it('fetchAllShoppingListItemsWithProducts pagina correctamente ítems de listas con products!inner', async () => {
+      const totalRows = 1050;
+      const mockRows = Array.from({ length: totalRows }, (_, i) => ({
+        id: `item-${i + 1}`,
+        list_id: `list-${(i % 3) + 1}`,
+        product_id: `prod-${i + 1}`,
+        quantity: 2,
+        currency_tag: 'VES',
+        captured_box_price_bs: 120,
+        products: { id: `prod-${i + 1}`, display_name: `Item ${i + 1}` },
+      }));
+
+      const rangesCalled: [number, number][] = [];
+      const mockSupabase = createMockSupabase({
+        onSelectShoppingListItems: (state) => {
+          expect(state.orders).toEqual([{ col: 'id', opts: { ascending: true } }]);
+          rangesCalled.push([state.rangeFrom!, state.rangeTo!]);
+          const slice = mockRows.slice(state.rangeFrom!, state.rangeTo! + 1);
+          return { data: slice, error: null };
+        },
+      });
+
+      const result = await fetchAllShoppingListItemsWithProducts(mockSupabase);
+      expect(result.length).toBe(1050);
+      expect(rangesCalled).toEqual([
+        [0, 999],
+        [1000, 1999],
+      ]);
     });
   });
 });
