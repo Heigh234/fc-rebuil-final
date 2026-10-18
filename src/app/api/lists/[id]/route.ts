@@ -13,7 +13,10 @@ import {
 } from '@/lib/domain/pricing';
 import { shoppingListInputSchema } from '@/lib/domain/validations';
 import { MESSAGES } from '@/lib/i18n/messages';
-import { fetchUploadPricesMap } from '@/lib/supabase/catalog-queries';
+import {
+  fetchUploadPricesMap,
+  fetchAllStoreProductsBasic,
+} from '@/lib/supabase/catalog-queries';
 import type {
   ShoppingListDetailDto,
   ShoppingListItemDto,
@@ -166,10 +169,8 @@ export async function GET(
       throw itemsError;
     }
 
-    // Consultar datos de Mi tienda
-    const { data: storeProducts } = await supabase
-      .from('store_products')
-      .select('product_id, custom_name, manual_price_bs');
+    // Consultar datos de Mi tienda paginando determinísticamente (CONT-REM-01)
+    const storeProducts = await fetchAllStoreProductsBasic(supabase);
 
     const storeMap = new Map<string, { customName: string; manualPriceBs: number | null }>();
     for (const sp of storeProducts ?? []) {
