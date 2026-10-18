@@ -43,13 +43,7 @@ export async function POST(
     // 1. Limpieza de cargas pendientes expiradas
     await supabase.rpc('expire_stale_pending_uploads');
 
-    // 2. Si el usuario cancela, marcar como 'failed' sin error
-    if (decision === 'cancel') {
-      await supabase.from('pdf_uploads').update({ status: 'failed' }).eq('id', uploadId);
-      return jsonSuccess({ status: 'cancelled' });
-    }
-
-    // 3. Confirmación: verificar que la carga siga 'pending'
+    // 2. Verificar existencia y estado 'pending' de la carga (CONT-REM-03)
     const { data: upload, error: uploadError } = await supabase
       .from('pdf_uploads')
       .select('*')
@@ -64,13 +58,27 @@ export async function POST(
       return conflict('La carga de PDF no está pendiente.');
     }
 
+    // 3. Si el usuario cancela, marcar como 'failed' sin error garantizando estado 'pending'
+    if (decision === 'cancel') {
+      await supabase
+        .from('pdf_uploads')
+        .update({ status: 'failed' })
+        .eq('id', uploadId)
+        .eq('status', 'pending');
+      return jsonSuccess({ status: 'cancelled' });
+    }
+
     // 4. Descargar el archivo desde el depósito
     const { data: blob, error: downloadError } = await supabase.storage
       .from(PDF_STORAGE_BUCKET)
       .download(upload.storage_path);
 
     if (downloadError || !blob) {
-      await supabase.from('pdf_uploads').update({ status: 'failed' }).eq('id', uploadId);
+      await supabase
+        .from('pdf_uploads')
+        .update({ status: 'failed' })
+        .eq('id', uploadId)
+        .eq('status', 'pending');
       return serverError('No se pudo descargar el archivo del depósito.');
     }
 
@@ -81,7 +89,11 @@ export async function POST(
     const parseResult = await parseDistributorPdfForApp(pdfBytes);
 
     if (!parseResult.ok) {
-      await supabase.from('pdf_uploads').update({ status: 'failed' }).eq('id', uploadId);
+      await supabase
+        .from('pdf_uploads')
+        .update({ status: 'failed' })
+        .eq('id', uploadId)
+        .eq('status', 'pending');
       return unprocessable(parseResult.userMessage);
     }
 
@@ -94,7 +106,11 @@ export async function POST(
     });
 
     if (rpcError || !rpcResult) {
-      await supabase.from('pdf_uploads').update({ status: 'failed' }).eq('id', uploadId);
+      await supabase
+        .from('pdf_uploads')
+        .update({ status: 'failed' })
+        .eq('id', uploadId)
+        .eq('status', 'pending');
       return serverError('No se pudo aplicar la carga de PDF.');
     }
 
@@ -109,7 +125,11 @@ export async function POST(
     if (uploadId) {
       try {
         const supabase = createServiceRoleClient();
-        await supabase.from('pdf_uploads').update({ status: 'failed' }).eq('id', uploadId);
+        await supabase
+          .from('pdf_uploads')
+          .update({ status: 'failed' })
+          .eq('id', uploadId)
+          .eq('status', 'pending');
       } catch {
         // Ignorar fallo secundario
       }
