@@ -31,11 +31,16 @@ import type {
   InvoiceDto,
 } from '@/types/contracts';
 
+const STICKY_NAV_STORAGE_KEY = 'bodega_fc_sticky_nav';
+
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TabKey>('store');
   const [workspace, setWorkspace] = useState<WorkspaceStateDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Modo global para fijar pestañas y buscador al hacer scroll hacia abajo
+  const [isStickyNavEnabled, setIsStickyNavEnabled] = useState(false);
 
   // Estados de interacción para pausar polling silencioso (Sección 23)
   const [isUploadBusy, setIsUploadBusy] = useState(false);
@@ -77,6 +82,30 @@ export default function HomePage() {
   useEffect(() => {
     fetchWorkspace();
   }, [fetchWorkspace]);
+
+  // Hidratación inicial de preferencia del interruptor Fijar desde localStorage
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(STICKY_NAV_STORAGE_KEY);
+      if (saved === 'true') {
+        setIsStickyNavEnabled(true);
+      }
+    } catch {
+      // Ignorar errores de acceso a almacenamiento local
+    }
+  }, []);
+
+  const handleToggleStickyNav = useCallback(() => {
+    setIsStickyNavEnabled((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(STICKY_NAV_STORAGE_KEY, String(next));
+      } catch {
+        // Ignorar errores de escritura en almacenamiento local
+      }
+      return next;
+    });
+  }, []);
 
   // Sincronización silenciosa en segundo plano (Sección 23)
   // Pausada mientras se sube un PDF, está abierta una hoja o se visualiza detalle/factura
@@ -137,11 +166,13 @@ export default function HomePage() {
         }}
       />
 
-      {/* 1. Encabezado verde fijo con botón Cargar PDF */}
+      {/* 1. Encabezado verde fijo con interruptor Fijar y botón Cargar PDF */}
       <AppHeader
         onUploadClick={() => {
           uploadControllerRef.current?.openFilePicker();
         }}
+        isStickyNavEnabled={isStickyNavEnabled}
+        onToggleStickyNav={handleToggleStickyNav}
       />
 
       {/* 2. Franja de información de carga activa (al tocarla abre historial de cargas, L710) */}
@@ -155,6 +186,7 @@ export default function HomePage() {
       {/* 3. Barra de navegación de 3 pestañas */}
       <TabNavigation
         activeTab={activeTab}
+        isSticky={isStickyNavEnabled}
         onTabChange={(tab) => {
           setActiveTab(tab);
           // Al cambiar de pestaña, resetear vista interna de compras a la raíz
@@ -183,6 +215,7 @@ export default function HomePage() {
                   onOpenAddToList={handleOpenAddToList}
                   onSheetOpenChange={setIsStoreSheetOpen}
                   onStoreChanged={() => setCatalogVersion((v) => v + 1)}
+                  isStickySearch={isStickyNavEnabled}
                 />
               </div>
             )}
@@ -198,6 +231,7 @@ export default function HomePage() {
                   onOpenAddToList={handleOpenAddToList}
                   onStoreChanged={() => setStoreVersion((v) => v + 1)}
                   onSheetOpenChange={setIsCatalogSheetOpen}
+                  isStickySearch={isStickyNavEnabled}
                 />
               </div>
             )}
