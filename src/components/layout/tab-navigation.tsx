@@ -13,6 +13,7 @@ export interface TabNavigationProps {
     catalog?: number;
     lists?: number;
   };
+  isSticky?: boolean;
 }
 
 interface TabItem {
@@ -27,13 +28,20 @@ const TABS: TabItem[] = [
   { key: 'lists', label: 'Compras', icon: ClipboardList },
 ];
 
-export function TabNavigation({ activeTab, onTabChange, badgeCounts }: TabNavigationProps) {
+export function TabNavigation({
+  activeTab,
+  onTabChange,
+  badgeCounts,
+  isSticky = false,
+}: TabNavigationProps) {
   return (
     <nav
       aria-label="Navegación principal"
-      className="w-full bg-[#FFFFFF] border-b border-[#E7E0D5] select-none"
+      className={`w-full bg-[#FFFFFF] border-b border-[#E7E0D5] select-none ${
+        isSticky ? 'sticky top-14 z-20 shadow-xs' : ''
+      }`}
     >
-      <div className="max-w-[448px] mx-auto grid grid-cols-3">
+      <div className="max-w-[448px] mx-auto grid grid-cols-3 h-14">
         {TABS.map(({ key, label, icon: Icon }) => {
           const isActive = activeTab === key;
           const count = badgeCounts?.[key];
@@ -45,7 +53,7 @@ export function TabNavigation({ activeTab, onTabChange, badgeCounts }: TabNaviga
               role="tab"
               aria-selected={isActive}
               onClick={() => onTabChange(key)}
-              className={`min-h-[48px] py-2 px-1 flex flex-col items-center justify-center gap-1 text-xs font-bold transition-colors relative cursor-pointer ${
+              className={`h-full min-h-[48px] py-2 px-1 flex flex-col items-center justify-center gap-1 text-xs font-bold transition-colors relative cursor-pointer ${
                 isActive
                   ? 'text-[#2D6A4F] border-b-2 border-[#2D6A4F] bg-[#FFFBF5]'
                   : 'text-[#78716C] hover:text-[#292524] hover:bg-[#F2EDE4]/40'
