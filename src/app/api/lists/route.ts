@@ -11,7 +11,11 @@ import {
 } from '@/lib/domain/pricing';
 import { getDefaultShoppingListName } from '@/lib/domain/format';
 import { shoppingListInputSchema } from '@/lib/domain/validations';
-import { fetchUploadPricesMap } from '@/lib/supabase/catalog-queries';
+import {
+  fetchUploadPricesMap,
+  fetchAllShoppingListItemsWithProducts,
+  fetchAllStoreProductsBasic,
+} from '@/lib/supabase/catalog-queries';
 import type {
   ShoppingListSummaryDto,
   ShoppingListStatus,
@@ -57,25 +61,8 @@ export async function GET() {
       return dateB - dateA;
     });
 
-    // 3. Consultar todos los ítems de las listas
-    const { data: allItems, error: itemsError } = await supabase
-      .from('shopping_list_items')
-      .select(`
-        id,
-        list_id,
-        product_id,
-        quantity,
-        currency_tag,
-        captured_box_price_bs,
-        products!inner (
-          id,
-          display_name
-        )
-      `);
-
-    if (itemsError) {
-      throw itemsError;
-    }
+    // 3. Consultar todos los ítems de las listas paginando determinísticamente (CONT-REM-01)
+    const allItems = await fetchAllShoppingListItemsWithProducts(supabase);
 
     const itemsByListId = new Map<string, typeof allItems>();
     for (const item of allItems ?? []) {
@@ -89,9 +76,7 @@ export async function GET() {
     let catalogPriceMap = new Map<string, number>();
 
     if (openLists.length > 0) {
-      const { data: storeProducts } = await supabase
-        .from('store_products')
-        .select('product_id, custom_name, manual_price_bs');
+      const storeProducts = await fetchAllStoreProductsBasic(supabase);
 
       for (const sp of storeProducts ?? []) {
         storeMap.set(sp.product_id, {
