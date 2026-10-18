@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { jsonSuccess, notFound, handleApiError } from '@/lib/api/http-error';
+import { isValidUuid } from '@/lib/domain/validations';
 import type { InvoiceDto, InvoiceLineDto, CurrencyTag } from '@/types/contracts';
 
 export const dynamic = 'force-dynamic';
@@ -10,6 +11,11 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
+
+    if (!isValidUuid(id)) {
+      return notFound('Factura no encontrada.');
+    }
+
     const supabase = createServiceRoleClient();
 
     // Consultar factura por ID de factura o por list_id
