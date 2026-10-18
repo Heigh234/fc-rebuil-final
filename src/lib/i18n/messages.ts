@@ -18,6 +18,8 @@ export const MESSAGES = {
   // Carga de PDF (L835-853)
   // ===========================================================================
   UPLOAD_PDF_BUTTON: 'Cargar PDF',
+  STICKY_TOGGLE_LABEL: 'Fijar',
+  STICKY_TOGGLE_ARIA_LABEL: 'Fijar pestañas y buscador al hacer scroll',
   PROGRESS_UPLOADING: 'Subiendo el PDF…',
   PROGRESS_READING: 'Leyendo los productos…',
   PROGRESS_UPDATING_CATALOG: 'Actualizando tu catálogo…',
