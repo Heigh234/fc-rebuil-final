@@ -264,3 +264,172 @@ export async function resolvePreviousPricesMap(
 
   return previousPriceMap;
 }
+
+export interface RawStoreProductWithCatalogRow {
+  id: string;
+  product_id: string;
+  custom_name: string;
+  manual_price_bs: number | string | null;
+  units_per_box: number;
+  margins: number[] | string;
+  position: number;
+  products:
+    | { id: string; display_name: string; source_name: string }
+    | { id: string; display_name: string; source_name: string }[];
+}
+
+export interface RawStoreProductBasicRow {
+  product_id: string;
+  custom_name: string;
+  manual_price_bs: number | string | null;
+}
+
+export interface RawShoppingListItemWithProductRow {
+  id: string;
+  list_id: string;
+  product_id: string;
+  quantity: number;
+  currency_tag: string;
+  captured_box_price_bs: number | string | null;
+  products:
+    | { id: string; display_name: string }
+    | { id: string; display_name: string }[];
+}
+
+/**
+ * Consulta todos los productos de Mi tienda con datos del producto del catálogo,
+ * paginando determinísticamente con `.range()` (CONT-REM-01).
+ */
+export async function fetchAllStoreProductsWithCatalog(
+  supabase: SupabaseClient
+): Promise<RawStoreProductWithCatalogRow[]> {
+  const allRows: RawStoreProductWithCatalogRow[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('store_products')
+      .select(`
+        id,
+        product_id,
+        custom_name,
+        manual_price_bs,
+        units_per_box,
+        margins,
+        position,
+        products!inner (
+          id,
+          display_name,
+          source_name
+        )
+      `)
+      .order('position', { ascending: true })
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(offset, offset + POSTGREST_PAGE_SIZE - 1);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    allRows.push(...(data as unknown as RawStoreProductWithCatalogRow[]));
+
+    if (data.length < POSTGREST_PAGE_SIZE) {
+      break;
+    }
+
+    offset += POSTGREST_PAGE_SIZE;
+  }
+
+  return allRows;
+}
+
+/**
+ * Consulta columnas básicas de store_products para cruces y conteos rápidos,
+ * paginando determinísticamente con `.range()` (CONT-REM-01).
+ */
+export async function fetchAllStoreProductsBasic(
+  supabase: SupabaseClient
+): Promise<RawStoreProductBasicRow[]> {
+  const allRows: RawStoreProductBasicRow[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('store_products')
+      .select('product_id, custom_name, manual_price_bs')
+      .order('id', { ascending: true })
+      .range(offset, offset + POSTGREST_PAGE_SIZE - 1);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    allRows.push(...(data as unknown as RawStoreProductBasicRow[]));
+
+    if (data.length < POSTGREST_PAGE_SIZE) {
+      break;
+    }
+
+    offset += POSTGREST_PAGE_SIZE;
+  }
+
+  return allRows;
+}
+
+/**
+ * Consulta todos los ítems de listas de compras con nombre del catálogo,
+ * paginando determinísticamente con `.range()` (CONT-REM-01).
+ */
+export async function fetchAllShoppingListItemsWithProducts(
+  supabase: SupabaseClient
+): Promise<RawShoppingListItemWithProductRow[]> {
+  const allRows: RawShoppingListItemWithProductRow[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('shopping_list_items')
+      .select(`
+        id,
+        list_id,
+        product_id,
+        quantity,
+        currency_tag,
+        captured_box_price_bs,
+        products!inner (
+          id,
+          display_name
+        )
+      `)
+      .order('id', { ascending: true })
+      .range(offset, offset + POSTGREST_PAGE_SIZE - 1);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    allRows.push(...(data as unknown as RawShoppingListItemWithProductRow[]));
+
+    if (data.length < POSTGREST_PAGE_SIZE) {
+      break;
+    }
+
+    offset += POSTGREST_PAGE_SIZE;
+  }
+
+  return allRows;
+}
+
