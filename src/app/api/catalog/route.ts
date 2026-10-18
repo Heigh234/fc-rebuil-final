@@ -4,7 +4,7 @@ import type { CatalogProductDto } from '@/types/contracts';
 import {
   fetchAllUploadPricesWithProducts,
   resolvePreviousPricesMap,
-  POSTGREST_PAGE_SIZE,
+  fetchAllStoreProductsBasic,
 } from '@/lib/supabase/catalog-queries';
 
 export const dynamic = 'force-dynamic';
@@ -56,34 +56,9 @@ export async function GET() {
       return jsonSuccess<CatalogProductDto[]>([]);
     }
 
-    // 5. Consultar productos existentes en Mi tienda (inStore) con paginación determinística
-    const storeProductIds = new Set<string>();
-    let storeOffset = 0;
-    while (true) {
-      const { data: storeRows, error: storeError } = await supabase
-        .from('store_products')
-        .select('product_id')
-        .order('id', { ascending: true })
-        .range(storeOffset, storeOffset + POSTGREST_PAGE_SIZE - 1);
-
-      if (storeError) {
-        throw storeError;
-      }
-
-      if (!storeRows || storeRows.length === 0) {
-        break;
-      }
-
-      for (const sp of storeRows) {
-        storeProductIds.add(sp.product_id);
-      }
-
-      if (storeRows.length < POSTGREST_PAGE_SIZE) {
-        break;
-      }
-
-      storeOffset += POSTGREST_PAGE_SIZE;
-    }
+    // 5. Consultar productos existentes en Mi tienda (inStore) con paginación determinística (CONT-REM-01)
+    const storeRows = await fetchAllStoreProductsBasic(supabase);
+    const storeProductIds = new Set<string>(storeRows.map((sp) => sp.product_id));
 
     // 6. Consultar cargas candidatas para el cálculo de "precio anterior" (Sección 8: L325)
     const previousPriceMap = await resolvePreviousPricesMap(supabase, {
